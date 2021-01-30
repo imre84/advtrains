@@ -595,7 +595,3 @@ end
 
 
 advtrains.interlocking.db = ildb
-
-
-
-

@@ -4,15 +4,21 @@
 -- Note that the group value of advtrains_signal is 2, which means "step 2 of signal capabilities"
 -- advtrains_signal=1 is meant for signals that do not implement set_aspect.
 
-local setaspectf = function(rot)
+local setaspectf = function(rot,wasgreen)
  return function(pos, node, asp)
 	if not asp.main.free then
 		if asp.shunt.free then
+			if not wasgreen then
+				advtrains.atc.signal_is_green(pos)
+			end
 			advtrains.ndb.swap_node(pos, {name="advtrains_signals_ks:hs_shunt_"..rot, param2 = node.param2})
 		else
 			advtrains.ndb.swap_node(pos, {name="advtrains_signals_ks:hs_danger_"..rot, param2 = node.param2})
 		end
 	else
+		if not wasgreen then
+			advtrains.atc.signal_is_green(pos)
+		end
 		if asp.dst.free and asp.main.speed == -1 then
 			advtrains.ndb.swap_node(pos, {name="advtrains_signals_ks:hs_free_"..rot, param2 = node.param2})
 		else
@@ -43,9 +49,12 @@ local suppasp = {
 }
 
 --Rangiersignal
-local setaspectf_ra = function(rot)
+local setaspectf_ra = function(rot,wasgreen)
  return function(pos, node, asp)
 	if asp.shunt.free then
+		if not wasgreen then
+			advtrains.atc.signal_is_green(pos)
+		end
 		advtrains.ndb.swap_node(pos, {name="advtrains_signals_ks:ra_shuntd_"..rot, param2 = node.param2})
 	else
 		advtrains.ndb.swap_node(pos, {name="advtrains_signals_ks:ra_danger_"..rot, param2 = node.param2})
@@ -120,7 +129,7 @@ for _, rtab in ipairs({
 			inventory_image = "advtrains_signals_ks_hs_inv.png",
 			sounds = default.node_sound_stone_defaults(),
 			advtrains = {
-				set_aspect = setaspectf(rot),
+				set_aspect = setaspectf(rot,prts.asp.main.free or prts.asp.shunt.free),
 				supported_aspects = suppasp,
 				get_aspect = function(pos, node)
 					return prts.asp
@@ -165,7 +174,7 @@ for _, rtab in ipairs({
 			inventory_image = "advtrains_signals_ks_ra_inv.png",
 			sounds = default.node_sound_stone_defaults(),
 			advtrains = {
-				set_aspect = setaspectf_ra(rot),
+				set_aspect = setaspectf_ra(rot,prts.asp.main.free),
 				supported_aspects = suppasp_ra,
 				get_aspect = function(pos, node)
 					return prts.asp

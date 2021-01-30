@@ -4,11 +4,9 @@
 local mrules_wallsignal = advtrains.meseconrules
 
 local function can_dig_func(pos)
-	if advtrains.interlocking then
-		return advtrains.interlocking.signal_can_dig(pos)
-	end
-	return true
+	return advtrains.atc.signal_can_dig(pos)
 end
+
 
 local function aspect(b)
 return {
@@ -28,7 +26,7 @@ return {
 }
 end
 
-for r,f in pairs({on={as="off", ls="green", als="red"}, off={as="on", ls="red", als="green"}}) do
+for r,f in pairs({on={as="off", ls="green", als="red", boolval=true}, off={as="on", ls="red", als="green", boolval=false}}) do
 
 	advtrains.trackplacer.register_tracktype("advtrains:retrosignal", "")
 	advtrains.trackplacer.register_tracktype("advtrains:signal", "")
@@ -63,6 +61,7 @@ for r,f in pairs({on={as="off", ls="green", als="red"}, off={as="on", ls="red", 
 				rules=advtrains.meseconrules,
 				["action_"..f.as] = function (pos, node)
 					advtrains.ndb.swap_node(pos, {name = "advtrains:retrosignal_"..f.as..rotation, param2 = node.param2}, true)
+					if(not f.boolval) then advtrains.atc.signal_is_green(pos) end
 				end
 			}},
 			on_rightclick=function(pos, node, player)
@@ -74,13 +73,18 @@ for r,f in pairs({on={as="off", ls="green", als="red"}, off={as="on", ls="red", 
 					advtrains.interlocking.show_ip_form(pos, pname)
 				elseif advtrains.check_turnout_signal_protection(pos, player:get_player_name()) then
 					advtrains.ndb.swap_node(pos, {name = "advtrains:retrosignal_"..f.as..rotation, param2 = node.param2}, true)
+					if(not f.boolval) then advtrains.atc.signal_is_green(pos) end
 				end
 			end,
 			-- new signal API
 			advtrains = {
 				set_aspect = function(pos, node, asp)
+					if f.boolval == asp.main.free then
+						return
+					end
 					if asp.main.free then
 						advtrains.ndb.swap_node(pos, {name = "advtrains:retrosignal_on"..rotation, param2 = node.param2}, true)
+						advtrains.atc.signal_is_green(pos)
 					else
 						advtrains.ndb.swap_node(pos, {name = "advtrains:retrosignal_off"..rotation, param2 = node.param2}, true)
 					end
@@ -136,8 +140,12 @@ for r,f in pairs({on={as="off", ls="green", als="red"}, off={as="on", ls="red", 
 			-- new signal API
 			advtrains = {
 				set_aspect = function(pos, node, asp)
+					if f.boolval == asp.main.free then
+						return
+					end
 					if asp.main.free then
 						advtrains.ndb.swap_node(pos, {name = "advtrains:signal_on"..rotation, param2 = node.param2}, true)
+						advtrains.atc.signal_is_green(pos)
 					else
 						advtrains.ndb.swap_node(pos, {name = "advtrains:signal_off"..rotation, param2 = node.param2}, true)
 					end
@@ -149,6 +157,7 @@ for r,f in pairs({on={as="off", ls="green", als="red"}, off={as="on", ls="red", 
 				setstate = function(pos, node, newstate)
 					if newstate == f.als then
 						advtrains.ndb.swap_node(pos, {name = "advtrains:signal_"..f.as..rotation, param2 = node.param2}, true)
+						if(not f.boolval) then advtrains.atc.signal_is_green(pos) end
 					end
 				end,
 			},
@@ -204,8 +213,12 @@ for r,f in pairs({on={as="off", ls="green", als="red"}, off={as="on", ls="red", 
 			-- new signal API
 			advtrains = {
 				set_aspect = function(pos, node, asp)
+					if f.boolval == asp.main.free then
+						return
+					end
 					if asp.main.free then
 						advtrains.ndb.swap_node(pos, {name = "advtrains:signal_wall_"..loc.."_on", param2 = node.param2}, true)
+						advtrains.atc.signal_is_green(pos)
 					else
 						advtrains.ndb.swap_node(pos, {name = "advtrains:signal_wall_"..loc.."_off", param2 = node.param2}, true)
 					end
@@ -217,6 +230,7 @@ for r,f in pairs({on={as="off", ls="green", als="red"}, off={as="on", ls="red", 
 				setstate = function(pos, node, newstate)
 					if newstate == f.als then
 						advtrains.ndb.swap_node(pos, {name = "advtrains:signal_wall_"..loc.."_"..f.as, param2 = node.param2}, true)
+						if(not f.boolval) then advtrains.atc.signal_is_green(pos) end
 					end
 				end,
 			},

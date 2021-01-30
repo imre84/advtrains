@@ -7,6 +7,12 @@ local eval_conditional
 
 -- ATC persistence table. advtrains.atc is created by init.lua when it loads the save file.
 atc.controllers = {}
+-- Assignment of signals to stoprails: signal_to_stoprail[stoprailpos]=signalpos
+atc.signal_to_stoprail = {}
+-- signal_refcount[signalpos]=number of times this signal is referenced in signal_to_stoprail
+atc.signal_refcount = {}
+-- cmds_for_signals[pos][train_id]="ATC command string"
+atc.cmds_for_signals = {}
 function atc.load_data(data)
 	local temp = data and data.controllers or {}
 	--transcode atc controller data to node hashes: table access times for numbers are far less than for strings
@@ -16,9 +22,24 @@ function atc.load_data(data)
 		end
 		atc.controllers[pts] = data
 	end
+	if not data then return end
+	if data.signal_to_stprl then
+		atc.signal_to_stoprail = data.signal_to_stprl
+	end
+	if data.signalrc then
+		atc.signal_refcount = data.signalrc
+	end
+	if data.c4s then
+		atc.cmds_for_signals = data.c4s
+	end
 end
 function atc.save_data()
-	return {controllers = atc.controllers}
+	return {
+		controllers = atc.controllers,
+		signal_to_stprl = atc.signal_to_stoprail,
+		signalrc = atc.signal_refcount,
+		c4s = atc.cmds_for_signals,
+	}
 end
 --contents: {command="...", arrowconn=0-15 where arrow points}
 
@@ -184,14 +205,6 @@ end
 
 --from trainlogic.lua train step
 local matchptn={
-	["SM"]=function(id, train)
-		train.tarvelocity=train.max_speed
-		return 2
-	end,
-	["S([0-9]+)"]=function(id, train, match)
-		train.tarvelocity=tonumber(match)
-		return #match+1
-	end,
 	["B([0-9]+)"]=function(id, train, match)
 		if train.velocity>tonumber(match) then
 			train.atc_brake_target=tonumber(match)
@@ -206,29 +219,32 @@ local matchptn={
 		train.tarvelocity = 0
 		return 2
 	end,
-	["W"]=function(id, train)
-		train.atc_wait_finish=true
-		return 1
-	end,
 	["D([0-9]+)"]=function(id, train, match)
 		train.atc_delay=tonumber(match)
 		return #match+1
 	end,
-	["R"]=function(id, train)
-		if train.velocity<=0 then
-			advtrains.invert_train(id)
-			advtrains.train_ensure_init(id, train)
-			-- no one minds if this failed... this shouldn't even be called without train being initialized...
-		else
-			atwarn(sid(id), attrans("ATC Reverse command warning: didn't reverse train, train moving!"))
+	["G([-]?%d+,[-]?%d+,[-]?%d+)"] = function(id, train, match)
+		--it's G because we're waiting for the green signal
+		local signalpos = minetest.string_to_pos(match)
+		local influencepoint_pts, iconnid = advtrains.interlocking.db.get_ip_by_signalpos(signalpos)
+		local influencepoint = minetest.string_to_pos(influencepoint_pts)
+		local is_green = true -- if all else fails we'll assume it was green (the same way if there's no influence point set, the signal is disregarded (and considered green)
+		for k,v in ipairs(train.lzb.oncoming) do
+			if vector.equals(v.pos,influencepoint) then
+				is_green = ( v.spd == nil ) or ( v.spd >0.001 )
+				break
+			end
 		end
-		return 1
-	end,
-	["O([LRC])"]=function(id, train, match)
-		local tt={L=-1, R=1, C=0}
-		local arr=train.atc_arrow and 1 or -1
-		train.door_open = tt[match]*arr
-		return 2
+
+		if is_green then
+			return #match + 1
+		end
+
+		local mycmds = train.atc_command
+		local a, b = string.find(mycmds,match,1,true)
+		mycmds = string.sub(mycmds,b+1)
+		advtrains.atc.set_commands_when_green(signalpos,id,mycmds)
+		return #(train.atc_command)+1
 	end,
 	["K"] = function(id, train)
 		if train.door_open == 0 then
@@ -254,6 +270,34 @@ local matchptn={
 				end
 			end
 		end
+		return 1
+	end,
+	["O([LRC])"]=function(id, train, match)
+		local tt={L=-1, R=1, C=0}
+		local arr=train.atc_arrow and 1 or -1
+		train.door_open = tt[match]*arr
+		return 2
+	end,
+	["R"]=function(id, train)
+		if train.velocity<=0 then
+			advtrains.invert_train(id)
+			advtrains.train_ensure_init(id, train)
+			-- no one minds if this failed... this shouldn't even be called without train being initialized...
+		else
+			atwarn(sid(id), attrans("ATC Reverse command warning: didn't reverse train, train moving!"))
+		end
+		return 1
+	end,
+	["S([0-9]+)"]=function(id, train, match)
+		train.tarvelocity=tonumber(match)
+		return #match+1
+	end,
+	["SM"]=function(id, train)
+		train.tarvelocity=train.max_speed
+		return 2
+	end,
+	["W"]=function(id, train)
+		train.atc_wait_finish=true
 		return 1
 	end,
 }
@@ -360,6 +404,76 @@ function atc.execute_atc_command(id, train)
 	end
 	atwarn(sid(id), attrans("ATC command parse error: Unknown command: @1", command))
 	atc.train_reset_command(train, true)
+end
+
+
+-- registers commands for given train for the event of given signal turning green
+function atc.set_commands_when_green(signal_pos,train_id,cmd)
+	local pts = advtrains.roundfloorpts(signal_pos)
+	if not atc.cmds_for_signals[pts] then
+		atc.cmds_for_signals[pts]={}
+	end
+	atc.cmds_for_signals[pts][train_id]=cmd
+end
+
+
+-- signal turned green callback
+function atc.signal_is_green(signal_pos)
+	local pts = advtrains.roundfloorpts(signal_pos)
+	local mylist=atc.cmds_for_signals[pts]
+	if not mylist then return end
+	for train_id,cmd in pairs(mylist) do
+		local thistrain=advtrains.trains[train_id]
+		advtrains.atc.train_set_command(thistrain, cmd, true)
+	end
+	atc.cmds_for_signals[pts]=nil
+end
+
+
+--we have 3 routines for signal_refcount: add new reference, subtract reference, query the number of references. for add and subtract nil is accepted as parameter for simplicity of usage
+function atc.add_signal_reference(signalpos)
+	if signalpos == nil then return end
+	local pts = advtrains.roundfloorpts(signalpos)
+	if atc.signal_refcount[pts] == nil then
+		atc.signal_refcount[pts] = 1
+	else
+		atc.signal_refcount[pts] = atc.signal_refcount[pts] + 1
+	end
+end
+function atc.subtract_signal_reference(signalpos)
+	if signalpos == nil then return end
+	local pts=advtrains.roundfloorpts(signalpos)
+	if atc.signal_refcount[pts] == 1 then
+		atc.signal_refcount[pts] = nil
+	else
+		atc.signal_refcount[pts] = atc.signal_refcount[pts] - 1
+	end
+end
+function atc.get_signal_referencecount(signalpos)
+	local pts = advtrains.roundfloorpts(signalpos)
+	local num = atc.signal_refcount[pts]
+	return num or 0
+end
+
+
+-- returns the signal for the stoprail at given position, if this is known
+function atc.get_signal_for_stoprail(stoprailpos)
+	local pts = advtrains.roundfloorpts(stoprailpos)
+	return atc.signal_to_stoprail[pts]
+end
+function atc.set_signal_for_stoprail(stoprailpos, signalpos)
+	local pts_stoprail = advtrains.roundfloorpts(stoprailpos)
+	atc.subtract_signal_reference(atc.signal_to_stoprail[pts_stoprail])
+	atc.signal_to_stoprail[pts_stoprail] = signalpos
+	atc.add_signal_reference(signalpos)
+end
+
+
+function atc.signal_can_dig(pos)
+	if advtrains.interlocking and not advtrains.interlocking.signal_can_dig(pos) then
+		return false
+	end
+	return atc.get_signal_referencecount(pos) == 0
 end
 
 

@@ -5,7 +5,15 @@
 -- advtrains_signal=1 is meant for signals that do not implement set_aspect.
 
 
-local setaspect = function(pos, node, asp)
+local function can_dig_func(pos)
+	return advtrains.atc.signal_can_dig(pos)
+end
+
+
+local setaspect = function(was_green, pos, node, asp)
+	if (was_green ~= asp.main.free) and asp.main.free then
+		advtrains.atc.signal_is_green(pos)
+	end
 	if not asp.main.free then
 		advtrains.ndb.swap_node(pos, {name="advtrains_interlocking:ds_danger"})
 	else
@@ -19,6 +27,14 @@ local setaspect = function(pos, node, asp)
 	if meta then
 		meta:set_string("infotext", minetest.serialize(asp))
 	end
+end
+
+local setaspect_fromgreen = function(pos, node, asp)
+	setaspect(true,pos,node,asp)
+end
+
+local setaspect_fromred = function(pos, node, asp)
+	setaspect(false,pos,node,asp)
 end
 
 local suppasp = {
@@ -51,14 +67,14 @@ minetest.register_node("advtrains_interlocking:ds_danger", {
 	},
 	sounds = default.node_sound_stone_defaults(),
 	advtrains = {
-		set_aspect = setaspect,
+		set_aspect = setaspect_fromred,
 		supported_aspects = suppasp,
 		get_aspect = function(pos, node)
 			return advtrains.interlocking.DANGER
 		end,
 	},
 	on_rightclick = advtrains.interlocking.signal_rc_handler,
-	can_dig = advtrains.interlocking.signal_can_dig,
+	can_dig = can_dig_func,
 })
 minetest.register_node("advtrains_interlocking:ds_free", {
 	description = "Demo signal at Free",
@@ -70,7 +86,7 @@ minetest.register_node("advtrains_interlocking:ds_free", {
 	},
 	sounds = default.node_sound_stone_defaults(),
 	advtrains = {
-		set_aspect = setaspect,
+		set_aspect = setaspect_fromgreen,
 		supported_aspects = suppasp,
 		get_aspect = function(pos, node)
 			return {
@@ -82,7 +98,7 @@ minetest.register_node("advtrains_interlocking:ds_free", {
 		end,
 	},
 	on_rightclick = advtrains.interlocking.signal_rc_handler,
-	can_dig = advtrains.interlocking.signal_can_dig,
+	can_dig = can_dig_func,
 })
 minetest.register_node("advtrains_interlocking:ds_slow", {
 	description = "Demo signal at Slow",
@@ -94,7 +110,7 @@ minetest.register_node("advtrains_interlocking:ds_slow", {
 	},
 	sounds = default.node_sound_stone_defaults(),
 	advtrains = {
-		set_aspect = setaspect,
+		set_aspect = setaspect_fromgreen,
 		supported_aspects = suppasp,
 		get_aspect = function(pos, node)
 			return {
@@ -106,6 +122,6 @@ minetest.register_node("advtrains_interlocking:ds_slow", {
 		end,
 	},
 	on_rightclick = advtrains.interlocking.signal_rc_handler,
-	can_dig = advtrains.interlocking.signal_can_dig,
+	can_dig = can_dig_funcg,
 })
 
