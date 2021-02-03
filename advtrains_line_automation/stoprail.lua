@@ -273,11 +273,12 @@ local adefunc = function(def, preset, suffix, rotation)
 							
 							-- Send ATC command and set text
 							local cmd="B0 W O"..stdata.doors..(stdata.kick and "K" or "").." D"..stdata.wait
+							if stdata.reverse then cmd=cmd.."R" end
 							local mysignal=advtrains.atc.get_signal_for_stoprail(pos)
 							if mysignal then
 								cmd=cmd.."G"..mysignal.x..","..mysignal.y..","..mysignal.z
 							end
-							cmd=cmd.." OC "..(stdata.reverse and "R" or "").."D"..(stdata.ddelay or 1) .. "S" ..(stdata.speed or "M")
+							cmd=cmd.." OC ".."D"..(stdata.ddelay or 1) .. "S" ..(stdata.speed or "M")
 							advtrains.atc.train_set_command(train, cmd, true)
 							train.text_inside = stnname
 							if tonumber(stdata.wait) then
