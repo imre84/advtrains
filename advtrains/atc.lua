@@ -477,6 +477,13 @@ function atc.signal_can_dig(pos)
 end
 
 
+function atc.signal_after_dig(pos)
+	atc.signal_is_green(pos)
+	if advtrains.interlocking then
+		advtrains.interlocking.signal_after_dig(pos)
+	end
+end
+
 
 --move table to desired place
 advtrains.atc=atc

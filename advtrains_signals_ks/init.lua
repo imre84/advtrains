@@ -4,6 +4,17 @@
 -- Note that the group value of advtrains_signal is 2, which means "step 2 of signal capabilities"
 -- advtrains_signal=1 is meant for signals that do not implement set_aspect.
 
+
+local function can_dig_func(pos)
+	return advtrains.atc.signal_can_dig(pos)
+end
+
+
+local function after_dig_func(pos)
+	return advtrains.atc.signal_after_dig(pos)
+end
+
+
 local setaspectf = function(rot,wasgreen)
  return function(pos, node, asp)
 	if not asp.main.free then

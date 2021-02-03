@@ -135,8 +135,8 @@ advtrains = {
 	end,
 }
 on_rightclick = advtrains.interlocking.signal_rc_handler
-can_dig =  advtrains.interlocking.signal_can_dig
-after_dig_node = advtrains.interlocking.signal_after_dig
+can_dig =  advtrains.atc.signal_can_dig
+after_dig_node = advtrains.atc.signal_after_dig
 
 (If you need to specify custom can_dig or after_dig_node callbacks,
 please call those functions anyway!)

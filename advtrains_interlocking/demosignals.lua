@@ -10,6 +10,11 @@ local function can_dig_func(pos)
 end
 
 
+local function after_dig_func(pos)
+	return advtrains.atc.signal_after_dig(pos)
+end
+
+
 local setaspect = function(was_green, pos, node, asp)
 	if (was_green ~= asp.main.free) and asp.main.free then
 		advtrains.atc.signal_is_green(pos)
@@ -75,6 +80,7 @@ minetest.register_node("advtrains_interlocking:ds_danger", {
 	},
 	on_rightclick = advtrains.interlocking.signal_rc_handler,
 	can_dig = can_dig_func,
+	after_dig_node = after_dig_func,
 })
 minetest.register_node("advtrains_interlocking:ds_free", {
 	description = "Demo signal at Free",
@@ -99,6 +105,7 @@ minetest.register_node("advtrains_interlocking:ds_free", {
 	},
 	on_rightclick = advtrains.interlocking.signal_rc_handler,
 	can_dig = can_dig_func,
+	after_dig_node = after_dig_func,
 })
 minetest.register_node("advtrains_interlocking:ds_slow", {
 	description = "Demo signal at Slow",
@@ -123,5 +130,5 @@ minetest.register_node("advtrains_interlocking:ds_slow", {
 	},
 	on_rightclick = advtrains.interlocking.signal_rc_handler,
 	can_dig = can_dig_funcg,
+	after_dig_node = after_dig_func,
 })
-
