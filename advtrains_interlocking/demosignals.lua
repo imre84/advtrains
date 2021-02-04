@@ -129,6 +129,6 @@ minetest.register_node("advtrains_interlocking:ds_slow", {
 		end,
 	},
 	on_rightclick = advtrains.interlocking.signal_rc_handler,
-	can_dig = can_dig_funcg,
+	can_dig = can_dig_func,
 	after_dig_node = after_dig_func,
 })
