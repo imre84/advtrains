@@ -55,10 +55,11 @@ Gx,y,z
 wait for signal at x,y,z to turn green before processing any further atc commands for this train
 
 Example:
-B0 W OL D5 G-1826,6,-815 OC D1SM
+B0 W OL K D5 R G-1826,6,-815 OC D1 SM
 
 G(humanreadablename)
-planned command, doesn't work yet, will use the pcnaming name of a signal, otherwise as above
+uses the pcnaming name of a signal, otherwise as above
+B0 W OL K D5 R G(thenextsignal) OC D1 SM
 
 # conditional statements:
 

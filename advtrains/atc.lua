@@ -203,6 +203,38 @@ function atc.get_atc_controller_formspec(pos, meta)
 	return formspec.."button_exit[0.5,4.5;7,1;save;"..attrans("Save").."]"
 end
 
+local function sub_atc_g(id, train, matchL, fullcmd, signalpos, descriptivename)
+	local influencepoint_pts, iconnid = advtrains.interlocking.db.get_ip_by_signalpos(signalpos)
+	local influencepoint = minetest.string_to_pos(influencepoint_pts)
+	local is_green = true -- if all else fails we'll assume it was green (the same way if there's no influence point set, the signal is disregarded (and considered green)
+	local found=false
+	for k,v in ipairs(train.lzb.oncoming) do
+		if vector.equals(v.pos,influencepoint) then
+			is_green = ( v.spd == nil ) or ( v.spd >0.001 )
+			found=true
+			break
+		end
+	end
+
+	if not found then
+		local msg = minetest.pos_to_string(signalpos)
+		if descriptivename then msg=msg.." ("..descriptivename..")" end
+		msg=attrans("ATC G command warning: signal at @1 is not in the path of the train",msg)
+		atwarn(sid(id), msg)
+	end
+
+	if is_green then
+		return matchL
+	end
+
+	local mycmds = train.atc_command
+	local a, b = string.find(mycmds,fullcmd,1,true)
+	mycmds = string.sub(mycmds,b+1)
+	advtrains.atc.set_commands_when_green(signalpos,id,mycmds)
+
+	return #(train.atc_command)+1
+end
+
 --from trainlogic.lua train step
 local matchptn={
 	["B([0-9]+)"]=function(id, train, match)
@@ -226,25 +258,16 @@ local matchptn={
 	["G([-]?%d+,[-]?%d+,[-]?%d+)"] = function(id, train, match)
 		--it's G because we're waiting for the green signal
 		local signalpos = minetest.string_to_pos(match)
-		local influencepoint_pts, iconnid = advtrains.interlocking.db.get_ip_by_signalpos(signalpos)
-		local influencepoint = minetest.string_to_pos(influencepoint_pts)
-		local is_green = true -- if all else fails we'll assume it was green (the same way if there's no influence point set, the signal is disregarded (and considered green)
-		for k,v in ipairs(train.lzb.oncoming) do
-			if vector.equals(v.pos,influencepoint) then
-				is_green = ( v.spd == nil ) or ( v.spd >0.001 )
-				break
-			end
+		return sub_atc_g(id, train, #match+1, "G"..match, signalpos)
+	end,
+	["G%(([^)]+)%)"] = function(id, train, match)
+		local signalpos = atlatc.pcnaming.resolve_pos(match)
+		if signalpos then
+			return sub_atc_g(id, train, #match+3, "G("..match..")", signalpos, match)
+		else
+			atwarn(sid(id), attrans("ATC G command warning: passive component named \"@1\" not found.",match))
+			return #match+3
 		end
-
-		if is_green then
-			return #match + 1
-		end
-
-		local mycmds = train.atc_command
-		local a, b = string.find(mycmds,match,1,true)
-		mycmds = string.sub(mycmds,b+1)
-		advtrains.atc.set_commands_when_green(signalpos,id,mycmds)
-		return #(train.atc_command)+1
 	end,
 	["K"] = function(id, train)
 		if train.door_open == 0 then
@@ -424,7 +447,9 @@ function atc.signal_is_green(signal_pos)
 	if not mylist then return end
 	for train_id,cmd in pairs(mylist) do
 		local thistrain=advtrains.trains[train_id]
-		advtrains.atc.train_set_command(thistrain, cmd, true)
+		if thistrain then
+			advtrains.atc.train_set_command(thistrain, cmd, true)
+		end
 	end
 	atc.cmds_for_signals[pts]=nil
 end
